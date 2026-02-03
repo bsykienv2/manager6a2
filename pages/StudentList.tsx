@@ -296,8 +296,23 @@ const StudentList: React.FC = () => {
   const openEditModal = (s?: Student) => {
     if (s) {
       setEditingStudent(s);
+      
+      // FIX: Ensure dateOfBirth is in YYYY-MM-DD format for input type="date"
+      let formattedDob = s.dateOfBirth || '';
+      // If it contains 'T' (ISO format), split it
+      if (formattedDob.includes('T')) {
+          formattedDob = formattedDob.split('T')[0];
+      }
+      // If it is in DD/MM/YYYY format (legacy data), convert to YYYY-MM-DD
+      else if (formattedDob.includes('/') && formattedDob.split('/').length === 3) {
+          const parts = formattedDob.split('/');
+          // Assuming DD/MM/YYYY
+          formattedDob = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+
       setFormData({
           ...s,
+          dateOfBirth: formattedDob,
           status: s.status || 'studying'
       });
       setPreviewImage(s.avatar || null);
