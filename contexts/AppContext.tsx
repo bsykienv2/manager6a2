@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
-  Student, ClassInfo, DailyAttendance, NotificationItem, User, Role, ToastMessage, ToastType, UserAccount, Review
+  Student, ClassInfo, DailyAttendance, NotificationItem, User, Role, ToastMessage, ToastType, UserAccount, Review, Message
 } from '../types';
 import * as Storage from '../services/storageService';
 import { api } from '../services/api';
@@ -54,11 +54,15 @@ interface AppContextType {
   addReview: (review: Review) => void;
   deleteReview: (id: string) => void;
 
-  // 7. Cấu hình hệ thống (API URL)
+  // 7. Tin nhắn
+  messages: Message[];
+  sendMessage: (msg: Message) => void;
+
+  // 8. Cấu hình hệ thống (API URL)
   apiUrl: string;
   updateApiUrl: (url: string) => void;
 
-  // 8. Toasts (Thông báo hệ thống)
+  // 9. Toasts (Thông báo hệ thống)
   toasts: ToastMessage[];
   showToast: (type: ToastType, message: string) => void;
   removeToast: (id: number) => void;
@@ -86,12 +90,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [notifications, setNotifications] = useState<NotificationItem[]>(Storage.getNotifications());
   const [dashboardNote, setDashboardNote] = useState<string>(Storage.getDashboardNote());
   const [reviews, setReviews] = useState<Review[]>(Storage.getReviews());
-  const [apiUrl, setApiUrl] = useState<string>(Storage.getApiUrl()); // New State
+  const [messages, setMessages] = useState<Message[]>(Storage.getMessages()); // NEW
+  const [apiUrl, setApiUrl] = useState<string>(Storage.getApiUrl());
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // Helper: Đảm bảo người dùng quản trị luôn tồn tại
+  // Helper: Đảm bảo người dùng quản trị luôn tồn tại và KHÔNG TRÙNG LẶP
   const ensurePrivilegedUsers = (users: UserAccount[]): UserAccount[] => {
-      const merged = [...users];
+      // 1. Merge danh sách hiện tại với danh sách mặc định (nếu thiếu)
+      let merged = [...users];
       const defaults = Storage.INITIAL_USERS;
       
       defaults.forEach(defUser => {
@@ -100,7 +106,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               merged.push(defUser);
           }
       });
-      return merged;
+
+      // 2. Deduplicate: Loại bỏ trùng lặp dựa trên Username
+      // Sử dụng Set để theo dõi username đã xuất hiện
+      const uniqueUsers: UserAccount[] = [];
+      const seenUsernames = new Set<string>();
+
+      merged.forEach(u => {
+          // Chuẩn hóa username về chữ thường để so sánh chính xác
+          const normalizedUsername = (u.username || '').toLowerCase();
+          if (!seenUsernames.has(normalizedUsername)) {
+              seenUsernames.add(normalizedUsername);
+              uniqueUsers.push(u);
+          }
+      });
+
+      return uniqueUsers;
   };
 
   // --- SYNC DATA WITH GOOGLE SHEETS ON STARTUP ---
@@ -108,10 +129,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     let mounted = true;
 
     const fetchData = async () => {
-        // 1. Dữ liệu local đã được load ở useState, đảm bảo admin tồn tại
+        // 1. Dữ liệu local đã được load ở useState, làm sạch trùng lặp ngay lập tức
         const safeLocalUsers = ensurePrivilegedUsers(Storage.getUsersList());
+        
+        // Nếu danh sách đã lọc khác với danh sách hiện tại (có trùng lặp), cập nhật ngay
         if (mounted && userAccounts.length !== safeLocalUsers.length) {
              setUserAccounts(safeLocalUsers);
+             Storage.saveUsersList(safeLocalUsers); // Lưu lại bản sạch vào storage
         }
 
         // 2. Nếu không có API URL, dừng sync background
@@ -170,7 +194,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                         }
                     });
                 }
-                const finalUsers = ensurePrivilegedUsers(mergedUsers);
+                const finalUsers = ensurePrivilegedUsers(mergedUsers); // Chạy khử trùng lặp lần cuối
                 setUserAccounts(finalUsers);
                 Storage.saveUsersList(finalUsers);
 
@@ -213,10 +237,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (!foundUser) {
           foundUser = Storage.INITIAL_USERS.find(u => u.username === username && u.password === password);
           if (foundUser) {
-              const fixedUsers = [...userAccounts, foundUser];
-              setUserAccounts(fixedUsers);
-              Storage.saveUsersList(fixedUsers);
+              // Trước khi thêm vào, kiểm tra xem đã có user nào trùng tên chưa (để tránh double add khi login)
+              const exists = userAccounts.some(u => u.username === username);
+              if (!exists) {
+                  const fixedUsers = [...userAccounts, foundUser];
+                  setUserAccounts(fixedUsers);
+                  Storage.saveUsersList(fixedUsers);
+              } else {
+                  // Nếu đã tồn tại nhưng sai pass ở trên (foundUser null), nghĩa là password sai
+                  // Nhưng đoạn logic này là fallback cho INITIAL_USERS
+              }
           }
+      }
+
+      // Check again after fallback check
+      if (!foundUser) {
+           foundUser = userAccounts.find(u => u.username === username && u.password === password);
       }
 
       if (foundUser) {
@@ -238,16 +274,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const registerUser = (user: UserAccount) => {
       const newUser = { ...user, status: 'pending' as const };
-      setUserAccounts([...userAccounts, newUser]);
-      Storage.saveUsersList([...userAccounts, newUser]);
-      api.createUser(newUser).catch(err => console.error("Register sync error", err));
+      // Check duplicate before add
+      const exists = userAccounts.some(u => u.username === newUser.username);
+      if (!exists) {
+          const newAccounts = [...userAccounts, newUser];
+          setUserAccounts(newAccounts);
+          Storage.saveUsersList(newAccounts);
+          api.createUser(newUser).catch(err => console.error("Register sync error", err));
+      }
   };
 
   const addUserAccount = (user: UserAccount) => {
       const newUser = { ...user, status: user.status || 'active' };
-      setUserAccounts([...userAccounts, newUser]);
-      Storage.saveUsersList([...userAccounts, newUser]);
-      api.createUser(newUser);
+      // Check duplicate before add
+      const exists = userAccounts.some(u => u.username === newUser.username);
+      if (!exists) {
+          const newAccounts = [...userAccounts, newUser];
+          setUserAccounts(newAccounts);
+          Storage.saveUsersList(newAccounts);
+          api.createUser(newUser);
+      }
   };
 
   const updateUserAccount = (updatedUser: UserAccount) => {
@@ -281,9 +327,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const updateClassInfo = (info: ClassInfo) => {
     setClassInfo(info);
     Storage.saveClassInfo(info);
-    // Config update is special, send specific keys to backend if needed or full object
-    // Current api.ts structure for getClassInfo expects array, but update needs refactoring on backend
-    // For now, we rely on local storage for immediate feel.
   };
 
   const addStudent = (student: Student) => {
@@ -363,9 +406,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setAttendanceHistory(newHistory);
     Storage.saveAttendance(record);
     
-    // Backend supports creating full day attendance now via attendance.create
-    // But our API maps it to create records. 
-    // We send records array to API which calls attendance.create (GAS handles array)
     api.createAttendanceRecord(record.records.map(r => ({
         date: record.date,
         studentId: r.studentId,
@@ -415,6 +455,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     api.deleteReview(id);
   };
 
+  const sendMessage = (msg: Message) => {
+      // 1. Save Message
+      const newMessages = [...messages, msg];
+      setMessages(newMessages);
+      Storage.saveMessages(newMessages);
+
+      // 2. Create Notification for the Receiver
+      // Determine the category name/sender name
+      const senderName = currentUser?.fullName || 'Người gửi';
+      const notification: NotificationItem = {
+          id: `notif_${msg.id}`,
+          title: `Tin nhắn mới từ ${senderName}`,
+          content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''), // Preview content
+          date: new Date().toISOString(),
+          type: 'info',
+          category: 'message', // Special category to distinguish
+          senderName: senderName
+      };
+      
+      // NOTE: We're adding to the global notification list here. 
+      // In a real backend, we'd target the specific user. 
+      // Here, filtering happens in UI based on roles/context if needed, 
+      // or we accept that "Class Notifications" are broadcast.
+      // To simulate private notification, we'll rely on the receiver checking their Messages tab, 
+      // OR we add this notification globally but UI filters it. 
+      // Since `notifications` are currently global/class-wide in this simple app architecture,
+      // we'll add it, but strictly speaking, it should only be visible to the receiver.
+      // For now, let's add it to the notification list so it shows up in the "Notifications" page as requested.
+      addNotification(notification);
+  };
+
   const updateApiUrl = (url: string) => {
       setApiUrl(url);
       Storage.saveApiUrl(url);
@@ -423,8 +494,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const refreshData = () => {
       setSyncStatus('syncing');
       if (Storage.getApiUrl()) {
-        // Force re-fetch logic same as useEffect
-        // ... (Simplified logic here calls reload to trigger useEffect)
         window.location.reload(); 
       }
   };
@@ -440,6 +509,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     notifications, addNotification, deleteNotification,
     dashboardNote, updateDashboardNote,
     reviews, addReview, deleteReview,
+    messages, sendMessage, // NEW
     apiUrl, updateApiUrl,
     toasts, showToast, removeToast,
     refreshData
