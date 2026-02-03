@@ -1,5 +1,5 @@
 
-import { Student, Gender, ClassInfo, DailyAttendance, NotificationItem, User, UserAccount, Role, Review } from '../types';
+import { Student, Gender, ClassInfo, DailyAttendance, NotificationItem, User, UserAccount, Role, Review, Message } from '../types';
 
 const STORAGE_KEYS = {
   SYSTEM_INIT: 'lhs_system_initialized_v2', // Cờ kiểm tra lần đầu chạy app
@@ -11,11 +11,12 @@ const STORAGE_KEYS = {
   CURRENT_USER: 'lhs_current_user', 
   USERS: 'lhs_users_list_v2', 
   REVIEWS: 'lhs_reviews', 
+  MESSAGES: 'lhs_messages', // NEW: Tin nhắn
   API_URL: 'lhs_api_url', // NEW: Key cho API URL
 };
 
 // Đặt rỗng để buộc người dùng nhập URL mới
-const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyYlYm0BxW5V05b8tCcdoU9ms-oUKJ2MyV4zZ5bff85jcovuOC3AxtHvazwRrnNhg71NA/exec'; 
+const DEFAULT_API_URL = ''; 
 
 const safeParse = <T>(key: string, defaultValue: T): T => {
   try {
@@ -143,7 +144,6 @@ const initializeSystem = () => {
 initializeSystem();
 
 export const getUsersList = (): UserAccount[] => {
-  // Pass INITIAL_USERS as default. safeParse handles empty array check.
   return safeParse<UserAccount[]>(STORAGE_KEYS.USERS, INITIAL_USERS);
 };
 
@@ -155,7 +155,6 @@ export const getStudents = (): Student[] => {
   const students = safeParse<Student[]>(STORAGE_KEYS.STUDENTS, []);
   return students.map(s => {
     const fullNameSafe = s.fullName || '';
-    // Tự động tách tên nếu thiếu
     if (!s.firstName || !s.lastName) {
       const parts = fullNameSafe.trim().split(' ');
       const firstName = parts.pop() || '';
@@ -227,7 +226,15 @@ export const saveReviews = (reviews: Review[]): void => {
   localStorage.setItem(STORAGE_KEYS.REVIEWS, JSON.stringify(reviews));
 };
 
-// NEW: API URL Management
+// NEW: Messages Storage
+export const getMessages = (): Message[] => {
+  return safeParse<Message[]>(STORAGE_KEYS.MESSAGES, []);
+};
+
+export const saveMessages = (messages: Message[]): void => {
+  localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(messages));
+};
+
 export const getApiUrl = (): string => {
   return localStorage.getItem(STORAGE_KEYS.API_URL) || DEFAULT_API_URL;
 };
