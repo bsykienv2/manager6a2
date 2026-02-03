@@ -46,8 +46,9 @@ const StudentList: React.FC = () => {
   const [formData, setFormData] = useState<Partial<Student>>({
     firstName: '', lastName: '', fullName: '', gender: Gender.MALE, dateOfBirth: '', address: '',
     status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: '',
-    fatherName: '', fatherPhone: '', fatherJob: '',
-    motherName: '', motherPhone: '', motherJob: '',
+    fatherName: '', fatherPhone: '', fatherJob: '', fatherYearOfBirth: '',
+    motherName: '', motherPhone: '', motherJob: '', motherYearOfBirth: '',
+    guardianName: '', guardianPhone: '', guardianJob: ''
   });
 
   // --- IMAGE EDITOR STATES ---
@@ -313,7 +314,12 @@ const StudentList: React.FC = () => {
           dateOfBirth: formattedDob,
           status: s.status || 'studying',
           fatherJob: s.fatherJob || '',
-          motherJob: s.motherJob || ''
+          motherJob: s.motherJob || '',
+          fatherYearOfBirth: s.fatherYearOfBirth || '',
+          motherYearOfBirth: s.motherYearOfBirth || '',
+          guardianName: s.guardianName || '',
+          guardianPhone: s.guardianPhone || '',
+          guardianJob: s.guardianJob || ''
       });
       setPreviewImage(s.avatar || null);
     } else {
@@ -321,8 +327,9 @@ const StudentList: React.FC = () => {
       setFormData({
         firstName: '', lastName: '', fullName: '', gender: Gender.MALE, dateOfBirth: '', address: '',
         status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: '',
-        fatherName: '', fatherPhone: '', fatherJob: '',
-        motherName: '', motherPhone: '', motherJob: '',
+        fatherName: '', fatherPhone: '', fatherJob: '', fatherYearOfBirth: '',
+        motherName: '', motherPhone: '', motherJob: '', motherYearOfBirth: '',
+        guardianName: '', guardianPhone: '', guardianJob: ''
       });
       setPreviewImage(null);
     }
@@ -635,21 +642,21 @@ const StudentList: React.FC = () => {
                      <div className="grid grid-cols-2 gap-4">
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ đệm</label>
-                             <input className="w-full p-2 border rounded" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} required />
+                             <input className="w-full p-2 border rounded" value={formData.lastName || ''} onChange={e => setFormData({...formData, lastName: e.target.value})} required />
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tên</label>
-                             <input className="w-full p-2 border rounded" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} required />
+                             <input className="w-full p-2 border rounded" value={formData.firstName || ''} onChange={e => setFormData({...formData, firstName: e.target.value})} required />
                          </div>
                      </div>
                      <div className="grid grid-cols-2 gap-4">
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
-                             <input type="date" className="w-full p-2 border rounded" value={formData.dateOfBirth} onChange={e => setFormData({...formData, dateOfBirth: e.target.value})} required />
+                             <input type="date" className="w-full p-2 border rounded" value={formData.dateOfBirth || ''} onChange={e => setFormData({...formData, dateOfBirth: e.target.value})} required />
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
-                             <select className="w-full p-2 border rounded" value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
+                             <select className="w-full p-2 border rounded" value={formData.gender || Gender.MALE} onChange={e => setFormData({...formData, gender: e.target.value as Gender})}>
                                  <option value={Gender.MALE}>Nam</option>
                                  <option value={Gender.FEMALE}>Nữ</option>
                              </select>
@@ -694,45 +701,82 @@ const StudentList: React.FC = () => {
                          </div>
                      </div>
                      
-                     {/* CONTACT INFO WITH JOBS ADDED */}
+                     {/* CONTACT INFO WITH PARENT JOBS AND GUARDIAN */}
                      <div className="border-t pt-4 mt-4">
-                         <h4 className="font-bold text-gray-700 mb-2">Thông tin liên hệ</h4>
+                         <h4 className="font-bold text-gray-700 mb-2">Thông tin liên hệ & Gia đình</h4>
                          <div className="grid grid-cols-1 gap-4">
                              <div>
-                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Địa chỉ</label>
-                                 <input className="w-full p-2 border rounded" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Địa chỉ thường trú</label>
+                                 <input className="w-full p-2 border rounded" value={formData.address || ''} onChange={e => setFormData({...formData, address: e.target.value})} />
                              </div>
                              
                              {/* Father Info */}
-                             <div className="grid grid-cols-3 gap-4">
-                                 <div>
-                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ tên Cha</label>
-                                     <input className="w-full p-2 border rounded" value={formData.fatherName} onChange={e => setFormData({...formData, fatherName: e.target.value})} />
-                                 </div>
-                                 <div>
-                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">SĐT Cha</label>
-                                     <input className="w-full p-2 border rounded" value={formData.fatherPhone} onChange={e => setFormData({...formData, fatherPhone: e.target.value})} />
-                                 </div>
-                                 <div>
-                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nghề nghiệp</label>
-                                     <input className="w-full p-2 border rounded" value={formData.fatherJob} onChange={e => setFormData({...formData, fatherJob: e.target.value})} />
-                                 </div>
+                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <p className="text-xs font-bold text-blue-600 mb-2 uppercase">Thông tin Cha</p>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 uppercase mb-1">Họ tên</label>
+                                        <input className="w-full p-2 border rounded text-sm bg-white" value={formData.fatherName || ''} onChange={e => setFormData({...formData, fatherName: e.target.value})} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 uppercase mb-1">Năm sinh</label>
+                                            <input className="w-full p-2 border rounded text-sm bg-white" placeholder="YYYY" value={formData.fatherYearOfBirth || ''} onChange={e => setFormData({...formData, fatherYearOfBirth: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 uppercase mb-1">SĐT</label>
+                                            <input className="w-full p-2 border rounded text-sm bg-white" value={formData.fatherPhone || ''} onChange={e => setFormData({...formData, fatherPhone: e.target.value})} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] text-gray-500 uppercase mb-1">Nghề nghiệp</label>
+                                    <input className="w-full p-2 border rounded text-sm bg-white" value={formData.fatherJob || ''} onChange={e => setFormData({...formData, fatherJob: e.target.value})} />
+                                </div>
                              </div>
 
                              {/* Mother Info */}
-                             <div className="grid grid-cols-3 gap-4">
-                                 <div>
-                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ tên Mẹ</label>
-                                     <input className="w-full p-2 border rounded" value={formData.motherName} onChange={e => setFormData({...formData, motherName: e.target.value})} />
-                                 </div>
-                                 <div>
-                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">SĐT Mẹ</label>
-                                     <input className="w-full p-2 border rounded" value={formData.motherPhone} onChange={e => setFormData({...formData, motherPhone: e.target.value})} />
-                                 </div>
-                                 <div>
-                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nghề nghiệp</label>
-                                     <input className="w-full p-2 border rounded" value={formData.motherJob} onChange={e => setFormData({...formData, motherJob: e.target.value})} />
-                                 </div>
+                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <p className="text-xs font-bold text-pink-600 mb-2 uppercase">Thông tin Mẹ</p>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 uppercase mb-1">Họ tên</label>
+                                        <input className="w-full p-2 border rounded text-sm bg-white" value={formData.motherName || ''} onChange={e => setFormData({...formData, motherName: e.target.value})} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 uppercase mb-1">Năm sinh</label>
+                                            <input className="w-full p-2 border rounded text-sm bg-white" placeholder="YYYY" value={formData.motherYearOfBirth || ''} onChange={e => setFormData({...formData, motherYearOfBirth: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-gray-500 uppercase mb-1">SĐT</label>
+                                            <input className="w-full p-2 border rounded text-sm bg-white" value={formData.motherPhone || ''} onChange={e => setFormData({...formData, motherPhone: e.target.value})} />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] text-gray-500 uppercase mb-1">Nghề nghiệp</label>
+                                    <input className="w-full p-2 border rounded text-sm bg-white" value={formData.motherJob || ''} onChange={e => setFormData({...formData, motherJob: e.target.value})} />
+                                </div>
+                             </div>
+
+                             {/* Guardian Info */}
+                             <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                <p className="text-xs font-bold text-green-600 mb-2 uppercase">Người giám hộ (Nếu có)</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 uppercase mb-1">Họ tên</label>
+                                        <input className="w-full p-2 border rounded text-sm bg-white" value={formData.guardianName || ''} onChange={e => setFormData({...formData, guardianName: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 uppercase mb-1">SĐT</label>
+                                        <input className="w-full p-2 border rounded text-sm bg-white" value={formData.guardianPhone || ''} onChange={e => setFormData({...formData, guardianPhone: e.target.value})} />
+                                    </div>
+                                </div>
+                                <div className="mt-2">
+                                    <label className="block text-[10px] text-gray-500 uppercase mb-1">Nghề nghiệp</label>
+                                    <input className="w-full p-2 border rounded text-sm bg-white" value={formData.guardianJob || ''} onChange={e => setFormData({...formData, guardianJob: e.target.value})} />
+                                </div>
                              </div>
                          </div>
                      </div>
