@@ -130,7 +130,8 @@ export interface NotificationItem {
   content: string;
   date: string;
   type: 'info' | 'warning' | 'urgent';
-  category?: 'class' | 'personal';
+  category?: 'class' | 'personal' | 'message'; // Added 'message' type
+  senderName?: string; // Optional for message type notifications
 }
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
@@ -150,4 +151,21 @@ export interface Review {
   periodName: string;
   content: string;
   date: string;
+}
+
+export interface Attachment {
+  type: 'image' | 'file';
+  url: string; // Base64 for demo
+  name: string;
+  size?: string;
+}
+
+export interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string; // 'teacher' OR studentId (parent linked to student)
+  content: string;
+  attachments?: Attachment[];
+  timestamp: string;
+  isRead: boolean;
 }
