@@ -13,6 +13,16 @@ interface ImportStats {
   ethnicities: Record<string, number>;
 }
 
+// Danh sách 54 dân tộc Việt Nam
+const ETHNICITIES = [
+  "Kinh", "Tày", "Thái", "Mường", "Hoa (Hán)", "Khơ-me", "Nùng", "H'Mông", "Dao", "Gia-rai", 
+  "Ê-đê", "Ba-na", "Sán Chay", "Chăm", "Xơ-đăng", "Sán Dìu", "Hrê", "Cơ-ho", "Ra-glai", "Mnông", 
+  "Thổ", "Xtiêng", "Khơmú", "Bru-Vân Kiều", "Giáy", "Cơ-tu", "Gié-Triêng", "Ta-ôi", "Mạ", "Co", 
+  "Chơ-ro", "Hà Nhì", "Xinh-mun", "Chu-ru", "Lào", "La-chí", "Phù Lá", "La Hủ", "Kháng", "Lự", 
+  "Pà Thẻn", "Lô Lô", "Chứt", "Mảng", "Cờ Lao", "Bố Y", "La Ha", "Cống", "Ngái", "Si La", 
+  "Pu Péo", "Brâu", "Rơ-măm", "Ơ-đu"
+];
+
 const StudentList: React.FC = () => {
   const { students, addStudent, updateStudent, deleteStudent, addStudents, clearAllStudents, showToast } = useApp();
   
@@ -35,7 +45,7 @@ const StudentList: React.FC = () => {
   // Form State
   const [formData, setFormData] = useState<Partial<Student>>({
     firstName: '', lastName: '', fullName: '', gender: Gender.MALE, dateOfBirth: '', address: '',
-    status: 'studying', placeOfBirth: '', ethnicity: '', cccd: '', avatar: ''
+    status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: ''
   });
 
   // --- IMAGE EDITOR STATES ---
@@ -295,7 +305,7 @@ const StudentList: React.FC = () => {
       setEditingStudent(null);
       setFormData({
         firstName: '', lastName: '', fullName: '', gender: Gender.MALE, dateOfBirth: '', address: '',
-        status: 'studying', placeOfBirth: '', ethnicity: '', cccd: '', avatar: ''
+        status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: ''
       });
       setPreviewImage(null);
     }
@@ -649,7 +659,15 @@ const StudentList: React.FC = () => {
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Dân tộc</label>
-                             <input className="w-full p-2 border rounded" value={formData.ethnicity || ''} onChange={e => setFormData({...formData, ethnicity: e.target.value})} />
+                             <select 
+                                className="w-full p-2 border rounded" 
+                                value={formData.ethnicity || 'Kinh'} 
+                                onChange={e => setFormData({...formData, ethnicity: e.target.value})}
+                             >
+                                {ETHNICITIES.map(eth => (
+                                    <option key={eth} value={eth}>{eth}</option>
+                                ))}
+                             </select>
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">CCCD / Mã ĐD</label>

@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { BookOpen, User, Lock, ArrowRight, AlertCircle, Phone, Facebook, Plus, Clock, RefreshCw, CheckCircle2, WifiOff } from 'lucide-react';
+import { BookOpen, User, Lock, ArrowRight, AlertCircle, Phone, Facebook, Plus, Clock, RefreshCw, CheckCircle2, WifiOff, HardDrive } from 'lucide-react';
 
 const Login: React.FC = () => {
   const { login, currentUser, syncStatus, refreshData } = useApp();
@@ -52,24 +53,17 @@ const Login: React.FC = () => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                  </div>
-                 <span className="font-semibold text-sm text-white">Hệ thống hoạt động ổn định</span>
+                 <span className="font-semibold text-sm text-white">Hệ thống Online</span>
              </div>
           );
       }
-      if (syncStatus === 'error') {
-          return (
-              <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2 text-red-300">
-                     <WifiOff size={14} />
-                     <span className="font-semibold text-sm">Mất kết nối máy chủ</span>
-                  </div>
-                  <button onClick={refreshData} className="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white transition-colors">
-                      Thử lại
-                  </button>
-              </div>
-          );
-      }
-      return <span className="text-sm text-gray-300">Sẵn sàng</span>;
+      // If error or idle (often means local mode), show simplified status
+      return (
+          <div className="flex items-center gap-3 text-blue-200">
+              <HardDrive size={14} />
+              <span className="font-semibold text-sm">Chế độ hoạt động độc lập (Local)</span>
+          </div>
+      );
   };
 
   return (

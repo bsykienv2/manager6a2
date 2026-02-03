@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { Menu, LogOut, User } from 'lucide-react';
@@ -13,7 +14,13 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Sử dụng Context để lấy thông tin lớp học và user
   const { classInfo, currentUser, logout } = useApp();
+  
+  // State cho Mobile Menu (Overlay)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // State cho Desktop Sidebar Collapse (Thu gọn/Mở rộng)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const handleLogoutConfirm = () => {
@@ -33,23 +40,41 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         onCancel={() => setIsLogoutModalOpen(false)}
       />
 
-      <Sidebar />
+      {/* Sidebar Component with Collapse Props */}
+      <Sidebar 
+        isCollapsed={isSidebarCollapsed} 
+        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        className="hidden md:flex" // Hiển thị dạng flex trên desktop
+      />
       
+      {/* Mobile Sidebar (Drawer) */}
+      <div className={`fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 md:hidden ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+         <Sidebar 
+            isCollapsed={false} 
+            onToggle={() => setIsMobileMenuOpen(false)} 
+            className="w-64 h-full shadow-2xl" 
+         />
+      </div>
+
       {/* Mobile Sidebar Overlay */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-black/50 z-20 md:hidden" onClick={() => setIsMobileMenuOpen(false)} />
       )}
       
-      <main className="flex-1 md:ml-64 transition-all duration-300 flex flex-col min-h-screen">
+      {/* Main Content Area - Điều chỉnh margin-left dựa trên trạng thái Sidebar */}
+      <main className={`flex-1 transition-all duration-300 flex flex-col min-h-screen ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
         {/* Header */}
         <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-4">
+            {/* Mobile Menu Button */}
             <button 
               className="md:hidden text-gray-600 hover:text-blue-600 transition-colors"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
               <Menu size={24} />
             </button>
+
+            {/* Class Info */}
             <div className="hidden sm:flex items-center gap-6">
                 <div className="flex flex-col">
                     <span className="text-xs text-gray-400 font-semibold uppercase">Lớp chủ nhiệm</span>

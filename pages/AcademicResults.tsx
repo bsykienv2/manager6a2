@@ -18,39 +18,12 @@ const ASSESSMENT_SUBJECTS = [
 
 const SUBJECTS = [...SCORE_SUBJECTS, ...ASSESSMENT_SUBJECTS];
 
-// --- FALLBACK COMMENTS (Hệ thống sẽ dùng nếu chưa cấu hình) ---
+// --- FALLBACK COMMENTS ---
 const DEFAULT_COMMENTS = {
     'Tốt': 'Chăm ngoan, học giỏi, có ý thức xây dựng bài.',
     'Khá': 'Ngoan, có cố gắng trong học tập. Cần phát huy hơn nữa.',
     'Đạt': 'Sức học trung bình, cần chăm chỉ làm bài tập về nhà.',
     'Chưa đạt': 'Học lực yếu, cần cố gắng nhiều hơn và chú ý nghe giảng.'
-};
-
-// --- HELPER: PARSE DATE ---
-const parseDate = (input: any): string => {
-    if (!input) return '';
-    if (typeof input === 'number') {
-         const date = new Date(Math.round((input - 25569) * 86400 * 1000));
-         return date.toISOString().split('T')[0];
-    }
-    if (typeof input === 'string') {
-        if (input.includes('/')) {
-            const parts = input.trim().split('/');
-            if (parts.length === 3) {
-                const d = parts[0].padStart(2, '0');
-                const m = parts[1].padStart(2, '0');
-                const y = parts[2];
-                return `${y}-${m}-${d}`;
-            }
-        }
-    }
-    try {
-        const d = new Date(input);
-        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-    } catch {
-        return '';
-    }
-    return '';
 };
 
 // --- COMPONENT: PHIẾU LIÊN LẠC (Dùng cho in ấn) ---
@@ -163,10 +136,9 @@ interface AcademicResultsProps {
 export default function AcademicResults({ defaultView }: AcademicResultsProps) {
   const { students, updateStudent, updateStudents, classInfo, showToast, currentUser } = useApp();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const scoreCardRef = useRef<HTMLDivElement>(null); // Ref to capture scorecard
+  const scoreCardRef = useRef<HTMLDivElement>(null); 
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // Check Role
   const isParent = currentUser?.role === Role.PARENT;
 
   const [viewMode, setViewMode] = useState<'table' | 'scorecard'>(() => {
@@ -176,15 +148,11 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
 
   const [currentTerm, setCurrentTerm] = useState<'HK1' | 'HK2' | 'CN'>('HK1');
   const [selectedForPrint, setSelectedForPrint] = useState<string[]>([]);
-  
-  // Refresh Key để ép input render lại giá trị mới khi update hàng loạt (import/delete)
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // State for Modals
   const [importPreview, setImportPreview] = useState<ImportPreviewData | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Update view mode when prop changes
   useEffect(() => {
       if (!isParent && defaultView) {
           setViewMode(defaultView);
@@ -193,15 +161,11 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
       }
   }, [defaultView, isParent]);
 
-  // --- LOGIC: SẮP XẾP & LỌC ---
   const sortedStudents = useMemo(() => {
     let list = [...students].filter(s => s.status !== 'dropped_out' && s.status !== 'transfer');
-    
-    // Nếu là PHỤ HUYNH -> Chỉ lấy con của họ
     if (isParent && currentUser?.studentId) {
         list = list.filter(s => s.id === currentUser.studentId);
     }
-
     return list.sort((a, b) => {
         const nameA = (a.firstName || '').toLowerCase();
         const nameB = (b.firstName || '').toLowerCase();
@@ -210,7 +174,6 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
     });
   }, [students, isParent, currentUser]);
 
-  // Set default selection for Parent or Scorecard mode
   useEffect(() => {
       if (viewMode === 'scorecard') {
           if (sortedStudents.length > 0 && selectedForPrint.length === 0 && isParent) {
@@ -235,7 +198,6 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
   const handleSelectByRank = (rank: string) => {
       if (!rank) return;
       const matchingIds = sortedStudents.filter(s => {
-          // Lấy xếp loại theo kỳ hiện tại
           const r = s.transcript?.[currentTerm]?.academicRank;
           return r === rank;
       }).map(s => s.id);
@@ -306,14 +268,10 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
                     const scores = { ...termData.scores };
                     
                     let hasChanges = false;
-
-                    // --- SYNC SCORES ---
                     SUBJECTS.forEach(sub => {
                         let val = normalizedRow[sub];
                         if (val !== undefined && val !== null && val !== "") {
                              if (SCORE_SUBJECTS.includes(sub)) {
-                                // IMPORTANT: Handle comma decimal separation for VN region
-                                // Replace comma with dot before parsing
                                 const valStr = val.toString().trim().replace(',', '.');
                                 const parsedVal = parseFloat(valStr);
                                 val = !isNaN(parsedVal) ? parsedVal.toString() : val.toString(); 
@@ -374,16 +332,12 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
   };
 
   const handleScoreUpdate = (studentId: string, subject: string, value: string) => {
-      // Prevent parents from editing
       if (isParent) return;
-      
       const student = students.find(s => s.id === studentId);
       if (!student || currentTerm === 'CN') return;
-      
       const transcript = student.transcript || {};
       const termData = transcript[currentTerm] || { scores: {} };
       const newScores = { ...termData.scores };
-      
       const isAssessment = ASSESSMENT_SUBJECTS.includes(subject);
 
       if (value === '') delete newScores[subject];
@@ -404,7 +358,6 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
               }
            }
       }
-
       const { rank } = calculatePerformance(newScores);
       updateStudent({ ...student, transcript: { ...transcript, [currentTerm]: { ...termData, scores: newScores, academicRank: rank } } });
   };
@@ -431,39 +384,22 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
               const hk1 = transcript['HK1'];
               const hk2 = transcript['HK2'];
 
-              // Chỉ tính toán khi có dữ liệu cả 2 kỳ (ít nhất là đã khởi tạo object)
-              // Hoặc chấp nhận tính khi có 1 trong 2 nhưng ưu tiên khi đủ cả 2 để chính xác
               if (hk1 && hk2) {
-                  // 1. Tính điểm tổng kết
                   const cnScores = calculateYearlyScores(hk1.scores || {}, hk2.scores || {});
-                  
-                  // 2. Xếp loại Học lực CN dựa trên điểm CN
                   const { rank } = calculatePerformance(cnScores);
-                  
-                  // 3. Tính Hạnh kiểm CN (tự động dựa trên HK1, HK2 nếu chưa có manual)
-                  // Nếu người dùng đã nhập tay Hạnh kiểm CN thì giữ nguyên, nếu chưa thì tính
                   let conduct = transcript.CN?.conduct;
                   if (!conduct) {
                       conduct = calculateYearlyConduct(hk1.conduct, hk2.conduct);
                   }
-
-                  // 4. Xét Danh hiệu (Xuất sắc / Giỏi)
                   const award = calculateAward(rank || '', conduct || '', cnScores);
-
                   student.transcript = { 
                       ...transcript, 
-                      CN: { 
-                          scores: cnScores, 
-                          academicRank: rank, 
-                          conduct: conduct,
-                          award: award 
-                      } 
+                      CN: { scores: cnScores, academicRank: rank, conduct: conduct, award: award } 
                   };
                   updates.push(student);
                   updatedCount++;
               }
           });
-          
           if (updatedCount > 0) {
               updateStudents(updates);
               showToast('success', `Đã tổng kết Cả năm cho ${updatedCount} học sinh có đủ dữ liệu 2 kỳ!`);
@@ -475,7 +411,6 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
               const student = JSON.parse(JSON.stringify(s));
               const transcript = student.transcript || {};
               const { rank } = calculatePerformance(transcript[currentTerm]?.scores);
-              
               student.transcript = { 
                   ...transcript, 
                   [currentTerm]: { ...transcript[currentTerm], academicRank: rank } 
@@ -492,41 +427,17 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
       setIsProcessing(true);
       const updates: Student[] = [];
       let updatedCount = 0;
-
       students.forEach(s => {
           const student = JSON.parse(JSON.stringify(s)); 
           if (!student.transcript) student.transcript = {};
           if (!student.transcript[currentTerm]) student.transcript[currentTerm] = { scores: {} };
-          
           const termData = student.transcript[currentTerm];
           const rank = termData.academicRank ? termData.academicRank.trim() : null;
-
           if (rank) {
               const configs = classInfo.scoreComments || [];
-              
-              // 1. Tìm nhận xét khớp với kỳ hiện tại (Ưu tiên cao nhất)
-              let config = configs.find(c => 
-                  c.rank && c.rank.toLowerCase() === rank.toLowerCase() && c.term === currentTerm
-              );
-
-              // 2. Nếu không có nhận xét riêng cho kỳ, tìm nhận xét chung (term undefined hoặc 'ALL' - nếu có)
-              if (!config) {
-                  config = configs.find(c => 
-                      c.rank && c.rank.toLowerCase() === rank.toLowerCase() && !c.term 
-                  );
-              }
-              
-              let commentContent = '';
-
-              if (config) {
-                  commentContent = config.content;
-              } else {
-                  const defaultContent = DEFAULT_COMMENTS[rank as keyof typeof DEFAULT_COMMENTS];
-                  if (defaultContent) {
-                      commentContent = defaultContent;
-                  }
-              }
-
+              let config = configs.find(c => c.rank && c.rank.toLowerCase() === rank.toLowerCase() && c.term === currentTerm);
+              if (!config) config = configs.find(c => c.rank && c.rank.toLowerCase() === rank.toLowerCase() && !c.term);
+              let commentContent = config ? config.content : DEFAULT_COMMENTS[rank as keyof typeof DEFAULT_COMMENTS] || '';
               if (commentContent && termData.academicNotes !== commentContent) {
                   termData.academicNotes = commentContent;
                   updates.push(student);
@@ -534,35 +445,26 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
               }
           }
       });
-
       if (updates.length > 0) {
           updateStudents(updates);
           showToast('success', `Đã cập nhật nhận xét cho ${updatedCount} học sinh (${currentTerm})!`);
       } else {
           showToast('info', 'Không có thay đổi nào.');
       }
-      
       setTimeout(() => setIsProcessing(false), 500);
   };
 
   const handleBatchDelete = () => {
       setIsProcessing(true);
       const updates: Student[] = [];
-      
       students.forEach(s => {
           const student = JSON.parse(JSON.stringify(s));
           if (student.transcript && student.transcript[currentTerm]) {
               const currentData = student.transcript[currentTerm];
-              student.transcript[currentTerm] = {
-                  ...currentData,
-                  scores: {},
-                  academicRank: undefined,
-                  academicNotes: undefined
-              };
+              student.transcript[currentTerm] = { ...currentData, scores: {}, academicRank: undefined, academicNotes: undefined };
               updates.push(student);
           }
       });
-      
       if (updates.length > 0) {
           updateStudents(updates);
           setRefreshKey(prev => prev + 1); 
@@ -570,7 +472,6 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
       } else {
           showToast('info', 'Không có dữ liệu điểm để xóa.');
       }
-      
       setIsProcessing(false);
       setShowDeleteConfirm(false);
   };
@@ -581,26 +482,30 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
   };
 
   const handleExportImage = async () => {
-      // Logic for Parents (Single View) or Teacher (need to select 1 to avoid large canvas crash)
-      // For this implementation, we will export the first scorecard found in the view
-      const cardElement = document.querySelector('.bg-white.p-8.max-w-\\[210mm\\]'); // Selector for ScoreCard container
+      // Logic for Teachers: Must select exactly one student to export as image safely
+      if (selectedForPrint.length !== 1) {
+          showToast('error', 'Vui lòng chọn chính xác 1 học sinh để xuất ảnh.');
+          return;
+      }
+      
+      const studentId = selectedForPrint[0];
+      const cardElement = document.getElementById(`scorecard-${studentId}`);
       
       if (!cardElement) {
-          showToast('error', 'Không tìm thấy phiếu liên lạc để xuất.');
+          showToast('error', 'Không tìm thấy phiếu liên lạc.');
           return;
       }
 
       setIsProcessing(true);
       try {
-          const canvas = await html2canvas(cardElement as HTMLElement, {
-              scale: 2, // Higher resolution
+          const canvas = await html2canvas(cardElement, {
+              scale: 2,
               useCORS: true,
               backgroundColor: '#ffffff'
           });
-          
           const image = canvas.toDataURL("image/png");
           const link = document.createElement('a');
-          const studentName = sortedStudents.find(s => selectedForPrint.includes(s.id))?.fullName || 'HocSinh';
+          const studentName = sortedStudents.find(s => s.id === studentId)?.fullName || 'HocSinh';
           link.href = image;
           link.download = `PhieuLienLac_${studentName}_${currentTerm}.png`;
           link.click();
@@ -615,7 +520,6 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
 
   return (
     <div className="space-y-6">
-      {/* --- CONFIRM MODALS --- */}
       <ConfirmModal 
         isOpen={showDeleteConfirm}
         title={`Xóa điểm ${currentTerm}?`}
@@ -639,7 +543,6 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
                               <X size={24} />
                           </button>
                       </div>
-                      
                       <div className="space-y-4">
                           <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-3">
                               <Info size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
@@ -652,24 +555,10 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
                                   </ul>
                               </div>
                           </div>
-                          <p className="text-xs text-gray-500 italic text-center">
-                              Lưu ý: Dữ liệu (Điểm số) sẽ ghi đè lên hệ thống nếu có thay đổi.
-                          </p>
                       </div>
-
                       <div className="flex gap-3 mt-8">
-                          <button 
-                            onClick={() => setImportPreview(null)} 
-                            className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-700 font-bold hover:bg-gray-50 transition-colors"
-                          >
-                              Hủy bỏ
-                          </button>
-                          <button 
-                            onClick={confirmImport} 
-                            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition-colors"
-                          >
-                              <Save size={18} /> Cập nhật ngay
-                          </button>
+                          <button onClick={() => setImportPreview(null)} className="flex-1 px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-700 font-bold hover:bg-gray-50 transition-colors">Hủy bỏ</button>
+                          <button onClick={confirmImport} className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition-colors"><Save size={18} /> Cập nhật ngay</button>
                       </div>
                   </div>
               </div>
@@ -682,31 +571,13 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
                 <h1 className="text-2xl font-bold text-gray-900 whitespace-nowrap">
                     {viewMode === 'table' ? 'Sổ Điểm Điện Tử' : 'Phiếu Liên Lạc'}
                 </h1>
-                
-                {/* BIG TERM FILTER TABS */}
                 <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
-                    <button 
-                        onClick={() => setCurrentTerm('HK1')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${currentTerm === 'HK1' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}
-                    >
-                        Học Kỳ 1
-                    </button>
-                    <button 
-                        onClick={() => setCurrentTerm('HK2')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${currentTerm === 'HK2' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}
-                    >
-                        Học Kỳ 2
-                    </button>
-                    <button 
-                        onClick={() => setCurrentTerm('CN')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${currentTerm === 'CN' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}
-                    >
-                        Cả Năm
-                    </button>
+                    <button onClick={() => setCurrentTerm('HK1')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${currentTerm === 'HK1' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Học Kỳ 1</button>
+                    <button onClick={() => setCurrentTerm('HK2')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${currentTerm === 'HK2' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Học Kỳ 2</button>
+                    <button onClick={() => setCurrentTerm('CN')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${currentTerm === 'CN' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>Cả Năm</button>
                 </div>
             </div>
             
-            {/* TOOLBAR */}
             <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
                 {!isParent && (
                     <div className="bg-gray-100 p-1 rounded-lg flex mr-2">
@@ -718,53 +589,21 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
                 {viewMode === 'table' && !isParent && (
                     <>
                         <button onClick={handleBatchUpdate} disabled={isProcessing} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-sm text-sm hover:bg-indigo-700 transition-colors">{isProcessing ? <RefreshCw size={18} className="animate-spin" /> : <Calculator size={18} />}{currentTerm === 'CN' ? 'Tính Cả Năm' : 'Xếp loại'}</button>
-                        
-                        <button 
-                            onClick={handleAutoComment} 
-                            disabled={isProcessing} 
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-bold shadow-sm text-sm hover:bg-purple-700 transition-colors"
-                            title={`Tự động điền nhận xét ${currentTerm} cho toàn bộ học sinh dựa trên Xếp loại`}
-                        >
-                            {isProcessing ? <RefreshCw size={18} className="animate-spin" /> : <Sparkles size={18} />} 
-                            Nhận xét
-                        </button>
-
-                        <button 
-                            onClick={() => setShowDeleteConfirm(true)} 
-                            disabled={isProcessing}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg font-bold text-sm hover:bg-red-100 transition-colors"
-                        >
-                            <Trash2 size={18} /> Xóa Điểm
-                        </button>
-
+                        <button onClick={handleAutoComment} disabled={isProcessing} className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg font-bold shadow-sm text-sm hover:bg-purple-700 transition-colors">{isProcessing ? <RefreshCw size={18} className="animate-spin" /> : <Sparkles size={18} />} Nhận xét</button>
+                        <button onClick={() => setShowDeleteConfirm(true)} disabled={isProcessing} className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg font-bold text-sm hover:bg-red-100 transition-colors"><Trash2 size={18} /> Xóa Điểm</button>
                         <button onClick={handleDownloadTemplate} className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg font-medium text-sm hover:bg-green-100 transition-colors"><Download size={18} /> Mẫu</button>
-                        
                         {currentTerm !== 'CN' && (
                             <div className="relative"><input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".xlsx, .xls" className="hidden" /><button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors"><Upload size={18} /> Import</button></div>
                         )}
                     </>
                 )}
                 
-                {/* Print & Export Image - Available for Everyone, especially visible in Scorecard mode */}
                 {viewMode === 'scorecard' && (
                     <>
-                        <button 
-                            onClick={handleExportImage} 
-                            disabled={isProcessing}
-                            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"
-                        >
-                            <ImageIcon size={18} /> Xuất Ảnh
-                        </button>
-                        <button 
-                            onClick={handlePrint} 
-                            className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg font-bold text-sm hover:bg-gray-900 transition-colors shadow-sm"
-                        >
-                            <Printer size={18} /> In Phiếu
-                        </button>
+                        <button onClick={handleExportImage} disabled={isProcessing} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 transition-colors shadow-sm"><ImageIcon size={18} /> Xuất Ảnh</button>
+                        <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg font-bold text-sm hover:bg-gray-900 transition-colors shadow-sm"><Printer size={18} /> In Phiếu</button>
                     </>
                 )}
-                
-                {/* Fallback print button for Table mode */}
                 {viewMode === 'table' && (
                      <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg font-medium text-sm hover:bg-gray-900 transition-colors"><Printer size={18} /> In</button>
                 )}
@@ -799,14 +638,11 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
                                     <td className="p-2 border-r text-center sticky left-0 bg-white z-10">{index + 1}</td>
                                     <td className="p-2 border-r sticky left-10 bg-white z-10 truncate text-gray-700" title={student.lastName}>{student.lastName}</td>
                                     <td className="p-2 border-r font-bold sticky left-[13.5rem] bg-white z-10 truncate text-blue-900 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center gap-1">
-                                        {student.avatar && (
-                                            <img src={student.avatar} alt="" className="w-4 h-4 rounded-full object-cover border border-gray-100" />
-                                        )}
+                                        {student.avatar && <img src={student.avatar} alt="" className="w-4 h-4 rounded-full object-cover border border-gray-100" />}
                                         {student.firstName}
                                     </td>
                                     <td className="p-2 border-r text-center text-xs text-gray-600">{student.gender}</td>
                                     <td className="p-2 border-r text-center text-xs text-gray-600">{new Date(student.dateOfBirth).toLocaleDateString('vi-VN', {day: '2-digit', month: '2-digit', year: '2-digit'})}</td>
-                                    
                                     {SUBJECTS.map(sub => (
                                         <td key={`${student.id}-${sub}-${currentTerm}-${refreshKey}`} className="p-0 border-r text-center">
                                             <input type="text" readOnly={currentTerm === 'CN'}
@@ -837,38 +673,22 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
         </div>
       )}
 
-      {/* PARENT VIEW OR SCORECARD MODE */}
       {viewMode === 'scorecard' && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 no-print">
               {!isParent && (
                   <div className="md:col-span-1 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden h-[calc(100vh-200px)] flex flex-col">
                       <div className="p-3 border-b border-gray-100 bg-white sticky top-0 z-10 space-y-3">
                           <div className="font-bold text-sm text-gray-800">Chọn học sinh in phiếu</div>
-                          
-                          {/* CONTROL PANEL: Select All & Filter */}
                           <div className="space-y-2">
-                              {/* Select All */}
-                              <div 
-                                  onClick={handleSelectAll}
-                                  className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors border border-dashed border-gray-300"
-                              >
+                              <div onClick={handleSelectAll} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors border border-dashed border-gray-300">
                                   <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${selectedForPrint.length === sortedStudents.length && sortedStudents.length > 0 ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-400 text-transparent bg-white'}`}>
                                       <Check size={14} strokeWidth={3} />
                                   </div>
                                   <span className="text-sm font-bold text-gray-700">Chọn tất cả ({sortedStudents.length})</span>
                               </div>
-
-                              {/* Filter Rank */}
                               <div className="relative group">
                                   <ListFilter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-hover:text-blue-600" />
-                                  <select 
-                                      onChange={(e) => {
-                                          handleSelectByRank(e.target.value);
-                                          e.target.value = ""; // Reset after select
-                                      }}
-                                      className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-gray-50 hover:bg-white font-medium text-gray-700 cursor-pointer transition-all"
-                                      defaultValue=""
-                                  >
+                                  <select onChange={(e) => { handleSelectByRank(e.target.value); e.target.value = ""; }} className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-gray-50 hover:bg-white font-medium text-gray-700 cursor-pointer transition-all" defaultValue="">
                                       <option value="" disabled>-- Lọc theo xếp loại ({currentTerm}) --</option>
                                       <option value="Tốt">Học lực: Tốt</option>
                                       <option value="Khá">Học lực: Khá</option>
@@ -878,11 +698,9 @@ export default function AcademicResults({ defaultView }: AcademicResultsProps) {
                               </div>
                           </div>
                       </div>
-                      
                       <div className="overflow-y-auto flex-1 p-2 space-y-1">
                           {sortedStudents.map(s => (
-                              <div key={s.id} onClick={() => toggleSelectOne(s.id)}
-                                className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${selectedForPrint.includes(s.id) ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
+                              <div key={s.id} onClick={() => toggleSelectOne(s.id)} className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${selectedForPrint.includes(s.id) ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
                                 {selectedForPrint.includes(s.id) ? <CheckSquare size={18} /> : <Square size={18} />}
                                 <span className="text-sm font-medium">{s.fullName}</span>
                               </div>

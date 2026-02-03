@@ -1,24 +1,24 @@
 
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import StudentList from './pages/StudentList';
+import StudentProfile from './pages/StudentProfile'; // Import trang mới
 import Attendance from './pages/Attendance';
 import Academic from './pages/Academic';
-import AcademicResults from './pages/AcademicResults'; // New Import
+import AcademicResults from './pages/AcademicResults';
 import Notifications from './pages/Notifications';
 import Reports from './pages/Reports';
 import AiAssistant from './pages/AiAssistant';
 import Settings from './pages/Settings';
 import AccountManagement from './pages/AccountManagement';
 import Login from './pages/Login';
-import Register from './pages/Register'; // New Page
+import Register from './pages/Register';
 import Reviews from './pages/Reviews';
 import ProtectedRoute from './components/ProtectedRoute';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Role } from './types';
-import { Outlet } from 'react-router-dom';
 
 const App: React.FC = () => {
   return (
@@ -49,7 +49,12 @@ const App: React.FC = () => {
                     <Route path="/reports" element={<Reports />} />
                 </Route>
 
-                {/* 4. Homeroom ONLY */}
+                {/* 4. Parent ONLY - New Profile View */}
+                <Route element={<ProtectedRoute allowedRoles={[Role.PARENT]} />}>
+                    <Route path="/student-profile" element={<StudentProfile />} />
+                </Route>
+
+                {/* 5. Homeroom ONLY */}
                 <Route element={<ProtectedRoute allowedRoles={[Role.HOMEROOM]} />}>
                     <Route path="/attendance" element={<Attendance />} />
                     <Route path="/notifications" element={<Notifications />} />

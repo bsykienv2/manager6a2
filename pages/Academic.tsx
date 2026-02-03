@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { Student, Role, TermData } from '../types';
-import { Search, Save, BookOpen, Star, User, ChevronRight, CheckCircle2, Trophy, ChevronDown, Sparkles, Award } from 'lucide-react';
-import { calculateAward } from '../utils/grading';
+import { Search, Save, BookOpen, Star, User, ChevronRight, CheckCircle2, Trophy, ChevronDown, Sparkles, Award, Calculator } from 'lucide-react';
+import { calculateAward, calculateYearlyScores, calculateYearlyConduct, calculatePerformance } from '../utils/grading';
 
 const SCORE_SUBJECTS = [
   "Toán", "Ngữ văn", "Ngoại ngữ", "GDCD", "Công nghệ", "Tin học", "KHTN", "LS-ĐL"
@@ -14,7 +14,7 @@ const ASSESSMENT_SUBJECTS = [
 ];
 
 const Academic: React.FC = () => {
-  const { students, updateStudent, classInfo, showToast, currentUser } = useApp();
+  const { students, updateStudent, updateStudents, classInfo, showToast, currentUser } = useApp();
   // Tạo local state để edit, khi save mới đẩy lên context
   const [localStudents, setLocalStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -61,7 +61,7 @@ const Academic: React.FC = () => {
     }));
   };
 
-  // Button Action: Tự động tính danh hiệu
+  // Button Action: Tự động tính danh hiệu (Cá nhân)
   const handleAutoAward = () => {
       if (!selectedStudentId || isParent) return;
       
@@ -85,6 +85,74 @@ const Academic: React.FC = () => {
           showToast('success', `Đã xếp loại: ${award}`);
           return newStudent;
       }));
+  };
+
+  // Button Action: Xếp loại Cả lớp (Bulk)
+  const handleClassClassification = () => {
+      // Validate: Chỉ hoạt động khi chọn Cả Năm
+      if (selectedTerm !== 'CN') {
+          showToast('error', 'Danh hiệu thi đua chỉ tính cho cả năm học, xin vui lòng chọn lại!');
+          return;
+      }
+
+      const updates: Student[] = [];
+      let successCount = 0;
+      let failCount = 0;
+
+      // Duyệt qua danh sách local (đã lọc active)
+      const newLocalStudents = localStudents.map(student => {
+          const s = JSON.parse(JSON.stringify(student)) as Student;
+          const hk1 = s.transcript?.HK1;
+          const hk2 = s.transcript?.HK2;
+
+          // Điều kiện: Phải có điểm và hạnh kiểm của cả 2 kỳ
+          const hasHK1 = hk1 && hk1.scores && Object.keys(hk1.scores).length > 0 && hk1.conduct;
+          const hasHK2 = hk2 && hk2.scores && Object.keys(hk2.scores).length > 0 && hk2.conduct;
+
+          if (hasHK1 && hasHK2) {
+              // 1. Tính điểm trung bình CN
+              const cnScores = calculateYearlyScores(hk1.scores, hk2.scores);
+              
+              // 2. Tính Xếp loại Học lực CN
+              const { rank } = calculatePerformance(cnScores);
+              
+              // 3. Tính Xếp loại Hạnh kiểm CN
+              const cnConduct = calculateYearlyConduct(hk1.conduct, hk2.conduct);
+              
+              // 4. Suy ra Danh hiệu
+              const award = calculateAward(rank || '', cnConduct || '', cnScores);
+
+              // Cập nhật vào transcript CN
+              if (!s.transcript) s.transcript = {};
+              if (!s.transcript.CN) s.transcript.CN = { scores: {} };
+              
+              s.transcript.CN = {
+                  ...s.transcript.CN,
+                  scores: cnScores,
+                  academicRank: rank,
+                  conduct: cnConduct,
+                  award: award
+              };
+
+              updates.push(s);
+              successCount++;
+              return s;
+          } else {
+              failCount++;
+              return student; // Giữ nguyên nếu không đủ đk
+          }
+      });
+
+      // Thông báo xác nhận
+      const confirmMessage = `Kết quả kiểm tra dữ liệu:\n\n- Đủ điều kiện xếp loại: ${successCount} học sinh\n- Chưa đủ dữ liệu (HK1/HK2): ${failCount} học sinh\n\nBạn có muốn thực hiện xếp loại Cả năm cho ${successCount} học sinh này không?`;
+      
+      if (window.confirm(confirmMessage)) {
+          setLocalStudents(newLocalStudents); // Cập nhật giao diện ngay
+          if (updates.length > 0) {
+              updateStudents(updates); // Lưu vào DB
+              showToast('success', `Đã xếp loại thành công cho ${updates.length} học sinh!`);
+          }
+      }
   };
 
   const handleSave = () => {
@@ -229,7 +297,7 @@ const Academic: React.FC = () => {
                         </div>
                     </div>
                     
-                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex items-center gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap">
                          {/* Filter Compact */}
                          <div className="flex items-center gap-2 mr-2">
                              <select 
@@ -244,14 +312,26 @@ const Academic: React.FC = () => {
                          </div>
 
                         {!isParent && (
-                            <button 
-                                onClick={handleSave}
-                                disabled={isSaving}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2 w-full sm:w-auto justify-center"
-                            >
-                                {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Save size={18} />}
-                                Lưu thay đổi
-                            </button>
+                            <>
+                                {/* Nút Xếp loại Cả lớp (Luôn hiện, xử lý logic khi bấm) */}
+                                <button 
+                                    onClick={handleClassClassification}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 rounded-lg font-bold shadow-md transition-all active:scale-95 flex items-center gap-2"
+                                    title="Tự động tính điểm, xếp loại và danh hiệu cho toàn bộ lớp dựa trên HK1 và HK2 (Chỉ hoạt động ở tab Cả năm)"
+                                >
+                                    <Calculator size={18} />
+                                    Xếp loại Cả lớp
+                                </button>
+
+                                <button 
+                                    onClick={handleSave}
+                                    disabled={isSaving}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold shadow-md transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2 w-full sm:w-auto justify-center"
+                                >
+                                    {isSaving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Save size={18} />}
+                                    Lưu thay đổi
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -362,12 +442,12 @@ const Academic: React.FC = () => {
                                     <div className="bg-white p-5 rounded-xl border border-purple-200 shadow-sm h-full flex flex-col">
                                         <div className="flex justify-between items-center mb-3">
                                             <label className="text-sm font-bold text-gray-700 block">Danh hiệu thi đua</label>
-                                            {/* Nút Xếp loại tự động cho CN */}
+                                            {/* Nút Xếp loại tự động cho CN (Cá nhân) */}
                                             {selectedTerm === 'CN' && !isParent && (
                                                 <button 
                                                     onClick={handleAutoAward}
                                                     className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded hover:bg-purple-200 transition-colors font-bold flex items-center gap-1"
-                                                    title="Tự động xếp loại danh hiệu dựa trên Học lực và Hạnh kiểm"
+                                                    title="Tự động xếp loại danh hiệu cá nhân"
                                                 >
                                                     <Award size={12} /> Xếp loại
                                                 </button>

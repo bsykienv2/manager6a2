@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../contexts/AppContext';
-import { Gender, Role } from '../types';
-import { TrendingUp, Users, Award, CalendarCheck, Printer, FileSpreadsheet, Download, BarChart2, CheckCircle2, Filter, AlertCircle, FileText } from 'lucide-react';
+import { Gender, Role, Student } from '../types';
+import { TrendingUp, Users, Award, CalendarCheck, Printer, FileSpreadsheet, Download, BarChart2, CheckCircle2, Filter, AlertCircle, FileText, Trophy } from 'lucide-react';
 import { exportToExcel } from '../services/exportService';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -19,7 +19,7 @@ const Reports: React.FC = () => {
   const isParent = currentUser?.role === Role.PARENT;
 
   // --- PHẦN TÍNH TOÁN SỐ LIỆU TỔNG QUAN (Chỉ tính học sinh ĐANG HỌC) ---
-  const activeStudents = useMemo(() => {
+  const activeStudents = useMemo<Student[]>(() => {
       let list = students.filter(s => s.status !== 'dropped_out' && s.status !== 'transfer');
       // If Parent, filter to ONLY their child
       if (isParent && currentUser?.studentId) {
@@ -28,14 +28,15 @@ const Reports: React.FC = () => {
       return list;
   }, [students, isParent, currentUser]);
   
-  const total = activeStudents.length; 
-  const male = activeStudents.filter(s => s.gender === Gender.MALE).length;
-  const female = activeStudents.filter(s => s.gender === Gender.FEMALE).length;
+  const total: number = activeStudents.length; 
+  const male: number = activeStudents.filter(s => s.gender === Gender.MALE).length;
+  const female: number = activeStudents.filter(s => s.gender === Gender.FEMALE).length;
   
   // TÍNH TOÁN THỐNG KÊ HỌC TẬP & RÈN LUYỆN DỰA TRÊN KỲ ĐƯỢC CHỌN
   const stats = useMemo(() => {
     const academic = { Tốt: 0, Khá: 0, Đạt: 0, 'Chưa đạt': 0 };
     const conduct = { Tốt: 0, Khá: 0, Đạt: 0, 'Chưa đạt': 0 }; // Rèn luyện
+    const awards: Record<string, number> = {}; // Danh hiệu
 
     activeStudents.forEach(s => {
         const termData = s.transcript?.[selectedTerm];
@@ -50,9 +51,15 @@ const Reports: React.FC = () => {
         else if (rl === 'Khá') conduct['Khá']++;
         else if (rl === 'Đạt' || rl === 'Trung bình') conduct['Đạt']++;
         else if (rl === 'Chưa đạt' || rl === 'Yếu') conduct['Chưa đạt']++;
+
+        // Thống kê danh hiệu
+        const aw = termData?.award;
+        if (aw && aw !== 'Không có' && aw.trim() !== '') {
+            awards[aw] = (awards[aw] || 0) + 1;
+        }
     });
 
-    return { academic, conduct };
+    return { academic, conduct, awards };
   }, [activeStudents, selectedTerm]);
 
   // --- DATA FOR CHARTS --- (Only for Teachers)
@@ -373,23 +380,43 @@ const Reports: React.FC = () => {
                        })}
                    </div>
                </div>
-               
-               {/* Download Tip */}
-                <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-6 rounded-xl shadow-lg text-white flex flex-col justify-between">
-                    <div>
-                       <h3 className="text-lg font-bold mb-2">Xuất dữ liệu</h3>
-                       <p className="text-indigo-100 text-sm leading-relaxed mb-4">
-                           Tải xuống báo cáo đầy đủ bao gồm danh sách lớp, điểm danh chi tiết và bảng tổng hợp kết quả học tập {termLabel}.
-                       </p>
-                    </div>
-                    <button 
-                        onClick={handleExcelExport}
-                        className="mt-auto flex items-center justify-center gap-2 text-xs bg-white text-indigo-700 font-bold py-2.5 px-4 rounded-lg shadow hover:bg-indigo-50 transition-colors"
-                    >
-                        <Download size={14} />
-                        Tải file Excel ngay
-                    </button>
+
+                {/* Thống kê Danh hiệu thi đua (NEW) */}
+               <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                   <div className="flex items-center justify-between mb-4">
+                       <div className="flex items-center gap-3">
+                           <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg"><Trophy size={20} /></div>
+                           <h3 className="font-semibold text-gray-700">Danh hiệu thi đua</h3>
+                       </div>
+                   </div>
+                   <div className="space-y-4 overflow-y-auto max-h-[220px]">
+                       {Object.keys(stats.awards).length > 0 ? (
+                            Object.entries(stats.awards).map(([awardName, count]) => {
+                                // FIX: Use Number(count) to avoid TS error
+                                const percent = total > 0 ? ((Number(count) / total) * 100).toFixed(0) : 0;
+                                return (
+                                    <div key={awardName}>
+                                        <div className="flex justify-between items-end mb-1">
+                                            <span className="text-xs font-medium text-gray-600 truncate max-w-[120px]" title={awardName}>{awardName}</span>
+                                            <span className="text-xs font-bold">{count} <span className="text-gray-400 font-normal">({percent}%)</span></span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 rounded-full h-1.5">
+                                            <div className="bg-yellow-400 h-1.5 rounded-full" style={{ width: `${percent}%` }}></div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                       ) : (
+                           <div className="h-full flex flex-col items-center justify-center text-gray-400 py-8">
+                                <Trophy size={32} className="opacity-20 mb-2" />
+                                <span className="text-xs italic">Chưa có danh hiệu nào</span>
+                           </div>
+                       )}
+                   </div>
                </div>
+               
+               {/* Download Tip (Optional: Can remove or keep if needed) */}
+               {/* Hidden for space or moved below charts */}
            </div>
        )}
 
@@ -519,6 +546,33 @@ const Reports: React.FC = () => {
                            </tr>
                        </tbody>
                    </table>
+
+                   {/* Add new table for Awards in Print View */}
+                   {Object.keys(stats.awards).length > 0 && (
+                       <div className="mt-4">
+                            <h4 className="font-bold text-sm mb-2">Thống kê Danh hiệu:</h4>
+                            <table className="w-full text-left border-collapse border border-black text-sm">
+                                <thead>
+                                    <tr className="bg-gray-50">
+                                        <th className="border border-black p-2 text-center">Danh hiệu</th>
+                                        <th className="border border-black p-2 text-center w-24">Số lượng</th>
+                                        <th className="border border-black p-2 text-center w-24">Tỷ lệ</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {Object.entries(stats.awards).map(([awardName, count]) => (
+                                        <tr key={awardName}>
+                                            <td className="border border-black p-2">{awardName}</td>
+                                            <td className="border border-black p-2 text-center font-bold">{count}</td>
+                                            <td className="border border-black p-2 text-center">
+                                                {total > 0 ? ((Number(count) / total) * 100).toFixed(1) : 0}%
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                       </div>
+                   )}
                </div>
 
                {/* Section 2: Chi tiết chuyên cần */}

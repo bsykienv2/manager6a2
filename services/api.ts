@@ -6,9 +6,8 @@ import { getApiUrl } from './storageService';
 const callGoogleScript = async (action: string, payload: any = {}) => {
   try {
     const apiUrl = getApiUrl();
+    // Silent return if no API URL configured (Local Mode)
     if (!apiUrl || apiUrl === 'undefined' || apiUrl === 'null' || apiUrl.trim() === '') {
-       console.warn("API URL not configured in Settings.");
-       // Trả về null để UI không crash, app sẽ chạy ở chế độ offline (local only)
        return null;
     }
 
@@ -30,18 +29,22 @@ const callGoogleScript = async (action: string, payload: any = {}) => {
     } catch (e) {
         // Nếu response chứa chuỗi đặc trưng của doGet hoặc lỗi HTML
         if (text.includes("Lớp Học Số API is running") || text.includes("<!DOCTYPE html>")) {
-             console.error("API Response Error (Not JSON):", text);
-             throw new Error("Lỗi kết nối: URL API có thể không chính xác hoặc Script chưa được Deploy đúng quyền 'Anyone'. Vui lòng kiểm tra Cài đặt.");
+             console.warn("API Error: Script chưa được Deploy đúng quyền 'Anyone' hoặc URL sai.");
+             return null;
         }
-        console.error("Invalid JSON:", text);
-        throw new Error("Dữ liệu trả về từ máy chủ không hợp lệ.");
+        console.warn("Invalid JSON from API. Using local data.");
+        return null;
     }
 
-    if (!json.ok) throw new Error(json.error || 'Unknown API Error');
+    if (!json.ok) {
+        console.warn(`API Error [${action}]: ${json.error}`);
+        return null;
+    }
     return json.data;
   } catch (error: any) {
-    console.error(`API Call Failed [${action}]:`, error);
-    throw error; // Ném lỗi để UI (toast) hiển thị
+    // Network error or fetch failed
+    console.warn(`Offline or API Unreachable [${action}]`);
+    return null; 
   }
 };
 
@@ -70,14 +73,10 @@ export const api = {
   },
   
   createStudent: (student: Student) => {
-      // Clone để không ảnh hưởng object gốc
       const payload = { ...student };
-      // Map lại một số trường cho khớp backend cũ nếu cần
       (payload as any).birthday = student.dateOfBirth;
-      // Stringify transcript để lưu vào 1 cột metadata
       (payload as any).metadata = JSON.stringify(student.transcript || {});
       delete (payload as any).transcript; 
-      
       return callGoogleScript('students.create', payload);
   },
 
@@ -86,7 +85,6 @@ export const api = {
       (payload as any).birthday = student.dateOfBirth;
       (payload as any).metadata = JSON.stringify(student.transcript || {});
       delete (payload as any).transcript;
-      
       return callGoogleScript('students.update', payload);
   },
 
@@ -100,7 +98,6 @@ export const api = {
       const grouped: Record<string, any[]> = {};
       
       flatRecords.forEach((r: any) => {
-          // Chuẩn hóa ngày tháng
           const dateKey = r.date ? r.date.split('T')[0] : ''; 
           if (!dateKey) return;
 
@@ -118,10 +115,9 @@ export const api = {
       }));
   },
 
-  // GAS supports array of records in attendance.create
   createAttendanceRecord: (records: any[]) => callGoogleScript('attendance.create', records),
   
-  // --- USERS (Parents/Teachers) ---
+  // --- USERS ---
   getUsers: async () => {
       const res = await callGoogleScript('parents.list');
       return res || [];
@@ -146,13 +142,12 @@ export const api = {
   createReview: (review: Review) => callGoogleScript('behavior.create', review),
   deleteReview: (id: string) => callGoogleScript('behavior.delete', { id }),
 
-  // --- CLASS INFO (CONFIG) ---
+  // --- CLASS INFO ---
   getClassInfo: async (): Promise<ClassInfo | null> => {
       const data = await callGoogleScript('classes.list');
       if (!data) return null;
 
       if (Array.isArray(data) && data.length > 0) {
-          // Lấy dòng cuối cùng (cấu hình mới nhất)
           const cls = data[data.length - 1]; 
           if (cls && cls.className) {
               return {
@@ -163,23 +158,20 @@ export const api = {
                   location: cls.location || '',
                   awardTitles: cls.awardTitles ? (typeof cls.awardTitles === 'string' ? JSON.parse(cls.awardTitles) : cls.awardTitles) : [],
                   scoreComments: cls.scoreComments ? (typeof cls.scoreComments === 'string' ? JSON.parse(cls.scoreComments) : cls.scoreComments) : [],
-                  teacherSignature: cls.teacherSignature || '' // Load signature
+                  teacherSignature: cls.teacherSignature || ''
               };
           }
       }
       return null;
   },
   
-  // Update Config by sending full object to create/update
   updateConfig: (info: ClassInfo) => {
       const payload = {
           ...info,
           year: info.schoolYear,
           awardTitles: JSON.stringify(info.awardTitles),
           scoreComments: JSON.stringify(info.scoreComments)
-          // teacherSignature is already in 'info' object, will be sent automatically
       };
-      // Sử dụng update để ghi đè cấu hình
       return callGoogleScript('classes.update', payload);
   }
 };
