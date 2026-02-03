@@ -97,10 +97,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Helper: Đảm bảo người dùng quản trị luôn tồn tại và KHÔNG TRÙNG LẶP
   // Updated with Trim and stricter normalization
   const ensurePrivilegedUsers = (users: UserAccount[]): UserAccount[] => {
-      // 1. Clean existing users: Trim usernames
+      // 1. Clean existing users: Trim usernames and ensure string
       const cleanedUsers = users.map(u => ({
           ...u,
-          username: (u.username || '').trim()
+          username: (u.username || '').toString().trim()
       }));
 
       // 2. Merge with defaults (checks against cleaned list)
@@ -114,19 +114,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           }
       });
 
-      // 3. Deduplicate (Keep first occurrence based on lowercase username)
-      const uniqueUsers: UserAccount[] = [];
-      const seenUsernames = new Set<string>();
-
+      // 3. Deduplicate (Use Map to keep unique by username, prefer the one with more info/fetched status)
+      const uniqueMap = new Map<string, UserAccount>();
+      
       cleanedUsers.forEach(u => {
-          const normalizedKey = u.username.toLowerCase();
-          if (!seenUsernames.has(normalizedKey)) {
-              seenUsernames.add(normalizedKey);
-              uniqueUsers.push(u);
+          const key = u.username.toLowerCase();
+          if (uniqueMap.has(key)) {
+              // If duplicates exist, merge them (prefer properties of the later one if valid)
+              const existing = uniqueMap.get(key)!;
+              uniqueMap.set(key, { ...existing, ...u });
+          } else {
+              uniqueMap.set(key, u);
           }
       });
 
-      return uniqueUsers;
+      return Array.from(uniqueMap.values());
   };
 
   // --- SYNC DATA WITH GOOGLE SHEETS ON STARTUP ---
@@ -184,17 +186,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     Storage.saveAttendanceHistory(fetchedAttendance);
                 }
 
-                // Merge Users logic
+                // Merge Users logic (FIXED DUPLICATE ISSUE)
                 const currentLocalUsers = Storage.getUsersList().length > 0 ? Storage.getUsersList() : Storage.INITIAL_USERS;
-                const localPrivilegedUsers = currentLocalUsers.filter(u => u.role !== Role.PARENT); // Keep existing admins
+                // Keep existing admins from local first
+                const localPrivilegedUsers = currentLocalUsers.filter(u => u.role !== Role.PARENT); 
                 
                 const mergedUsers = [...localPrivilegedUsers];
+                
                 if (fetchedUsers.length > 0) {
                     fetchedUsers.forEach((apiUser: UserAccount) => {
-                        const index = mergedUsers.findIndex(u => u.username === apiUser.username);
+                        // FIX: Normalize username for comparison (trim + lowercase)
+                        const apiUsername = (apiUser.username || '').toString().trim().toLowerCase();
+                        
+                        const index = mergedUsers.findIndex(u => 
+                            (u.username || '').toString().trim().toLowerCase() === apiUsername
+                        );
+                        
                         if (index >= 0) {
+                            // Found duplicate: Merge API data into existing (API is source of truth)
                             mergedUsers[index] = { ...mergedUsers[index], ...apiUser };
                         } else {
+                            // New user
                             mergedUsers.push(apiUser);
                         }
                     });
@@ -237,27 +249,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // --- ACTIONS (Cập nhật Local + Gọi API nền) ---
 
   const login = (username: string, password: string): { success: boolean; message?: string } => {
-      let foundUser = userAccounts.find(u => u.username === username && u.password === password);
+      // Normalize input
+      const cleanUsername = username.trim().toLowerCase();
       
+      let foundUser = userAccounts.find(u => (u.username || '').trim().toLowerCase() === cleanUsername && u.password === password);
+      
+      // Fallback check against INITIAL_USERS if local storage is somehow empty/corrupt but code has defaults
       if (!foundUser) {
-          foundUser = Storage.INITIAL_USERS.find(u => u.username === username && u.password === password);
+          foundUser = Storage.INITIAL_USERS.find(u => u.username.trim().toLowerCase() === cleanUsername && u.password === password);
           if (foundUser) {
-              // Trước khi thêm vào, kiểm tra xem đã có user nào trùng tên chưa (để tránh double add khi login)
-              const exists = userAccounts.some(u => u.username === username);
+              // Fix local storage if missing
+              const exists = userAccounts.some(u => u.username.trim().toLowerCase() === cleanUsername);
               if (!exists) {
                   const fixedUsers = [...userAccounts, foundUser];
                   setUserAccounts(fixedUsers);
                   Storage.saveUsersList(fixedUsers);
-              } else {
-                  // Nếu đã tồn tại nhưng sai pass ở trên (foundUser null), nghĩa là password sai
-                  // Nhưng đoạn logic này là fallback cho INITIAL_USERS
               }
           }
-      }
-
-      // Check again after fallback check
-      if (!foundUser) {
-           foundUser = userAccounts.find(u => u.username === username && u.password === password);
       }
 
       if (foundUser) {
