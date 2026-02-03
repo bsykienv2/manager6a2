@@ -13,6 +13,14 @@ const ASSESSMENT_SUBJECTS = [
   "GDTC", "Nghệ thuật", "HĐTN", "GDĐP"
 ];
 
+// --- FALLBACK COMMENTS ---
+const DEFAULT_COMMENTS = {
+    'Tốt': 'Chăm ngoan, học giỏi, có ý thức xây dựng bài.',
+    'Khá': 'Ngoan, có cố gắng trong học tập. Cần phát huy hơn nữa.',
+    'Đạt': 'Sức học trung bình, cần chăm chỉ làm bài tập về nhà.',
+    'Chưa đạt': 'Học lực yếu, cần cố gắng nhiều hơn và chú ý nghe giảng.'
+};
+
 const Academic: React.FC = () => {
   const { students, updateStudent, updateStudents, classInfo, showToast, currentUser } = useApp();
   // Tạo local state để edit, khi save mới đẩy lên context
@@ -122,6 +130,18 @@ const Academic: React.FC = () => {
               // 4. Suy ra Danh hiệu
               const award = calculateAward(rank || '', cnConduct || '', cnScores);
 
+              // 5. Tự động sinh nhận xét dựa trên Học lực (NEW Logic)
+              let autoComment = '';
+              if (rank) {
+                  const configs = classInfo.scoreComments || [];
+                  // Ưu tiên tìm comment cấu hình cho kỳ CN
+                  let config = configs.find(c => c.rank === rank && c.term === 'CN');
+                  // Nếu không có, tìm comment chung (không có term)
+                  if (!config) config = configs.find(c => c.rank === rank && !c.term);
+                  
+                  autoComment = config ? config.content : DEFAULT_COMMENTS[rank as keyof typeof DEFAULT_COMMENTS] || '';
+              }
+
               // Cập nhật vào transcript CN
               if (!s.transcript) s.transcript = {};
               if (!s.transcript.CN) s.transcript.CN = { scores: {} };
@@ -131,7 +151,8 @@ const Academic: React.FC = () => {
                   scores: cnScores,
                   academicRank: rank,
                   conduct: cnConduct,
-                  award: award
+                  award: award,
+                  academicNotes: autoComment // Cập nhật nhận xét tự động
               };
 
               updates.push(s);
@@ -144,13 +165,13 @@ const Academic: React.FC = () => {
       });
 
       // Thông báo xác nhận
-      const confirmMessage = `Kết quả kiểm tra dữ liệu:\n\n- Đủ điều kiện xếp loại: ${successCount} học sinh\n- Chưa đủ dữ liệu (HK1/HK2): ${failCount} học sinh\n\nBạn có muốn thực hiện xếp loại Cả năm cho ${successCount} học sinh này không?`;
+      const confirmMessage = `Kết quả kiểm tra dữ liệu:\n\n- Đủ điều kiện xếp loại: ${successCount} học sinh\n- Chưa đủ dữ liệu (HK1/HK2): ${failCount} học sinh\n\nHệ thống sẽ tính điểm, xếp loại, danh hiệu và TỰ ĐỘNG TẠO NHẬN XÉT cho ${successCount} học sinh này. Bạn có muốn tiếp tục?`;
       
       if (window.confirm(confirmMessage)) {
           setLocalStudents(newLocalStudents); // Cập nhật giao diện ngay
           if (updates.length > 0) {
               updateStudents(updates); // Lưu vào DB
-              showToast('success', `Đã xếp loại thành công cho ${updates.length} học sinh!`);
+              showToast('success', `Đã xếp loại và tạo nhận xét thành công cho ${updates.length} học sinh!`);
           }
       }
   };
