@@ -23,6 +23,19 @@ const ETHNICITIES = [
   "Pu Péo", "Brâu", "Rơ-măm", "Ơ-đu"
 ];
 
+// Danh sách Nơi sinh (Tỉnh/Thành phố)
+const PROVINCES = [
+  "TP. Hà Nội", "TP. Hồ Chí Minh", "TP. Hải Phòng", "TP. Huế", "TP. Đà Nẵng", "TP. Cần Thơ",
+  "An Giang", "Bà Rịa - Vũng Tàu", "Bắc Giang", "Bắc Kạn", "Bạc Liêu", "Bắc Ninh", "Bến Tre",
+  "Bình Định", "Bình Dương", "Bình Phước", "Bình Thuận", "Cà Mau", "Cao Bằng", "Đắk Lắk",
+  "Đắk Nông", "Điện Biên", "Đồng Nai", "Đồng Tháp", "Gia Lai", "Hà Giang", "Hà Nam", "Hà Tĩnh",
+  "Hải Dương", "Hậu Giang", "Hòa Bình", "Hưng Yên", "Khánh Hòa", "Kiên Giang", "Kon Tum",
+  "Lai Châu", "Lâm Đồng", "Lạng Sơn", "Lào Cai", "Long An", "Nam Định", "Nghệ An", "Ninh Bình",
+  "Ninh Thuận", "Phú Thọ", "Phú Yên", "Quảng Bình", "Quảng Nam", "Quảng Ngãi", "Quảng Ninh",
+  "Quảng Trị", "Sóc Trăng", "Sơn La", "Tây Ninh", "Thái Bình", "Thái Nguyên", "Thanh Hóa",
+  "Thừa Thiên Huế", "Tiền Giang", "Trà Vinh", "Tuyên Quang", "Vĩnh Long", "Vĩnh Phúc", "Yên Bái"
+];
+
 const StudentList: React.FC = () => {
   const { students, addStudent, updateStudent, deleteStudent, addStudents, clearAllStudents, showToast } = useApp();
   
@@ -657,7 +670,18 @@ const StudentList: React.FC = () => {
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nơi sinh</label>
-                             <input className="w-full p-2 border rounded" value={formData.placeOfBirth || ''} onChange={e => setFormData({...formData, placeOfBirth: e.target.value})} placeholder="Tỉnh/TP" />
+                             <input 
+                                className="w-full p-2 border rounded" 
+                                value={formData.placeOfBirth || ''} 
+                                onChange={e => setFormData({...formData, placeOfBirth: e.target.value})} 
+                                placeholder="Tỉnh/TP" 
+                                list="province-options"
+                             />
+                             <datalist id="province-options">
+                                 {PROVINCES.map(prov => (
+                                     <option key={prov} value={prov} />
+                                 ))}
+                             </datalist>
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
