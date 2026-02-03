@@ -298,16 +298,27 @@ const StudentList: React.FC = () => {
       setEditingStudent(s);
       
       // FIX: Ensure dateOfBirth is in YYYY-MM-DD format for input type="date"
-      let formattedDob = s.dateOfBirth || '';
-      // If it contains 'T' (ISO format), split it
-      if (formattedDob.includes('T')) {
-          formattedDob = formattedDob.split('T')[0];
-      }
-      // If it is in DD/MM/YYYY format (legacy data), convert to YYYY-MM-DD
-      else if (formattedDob.includes('/') && formattedDob.split('/').length === 3) {
-          const parts = formattedDob.split('/');
-          // Assuming DD/MM/YYYY
-          formattedDob = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      // AND respect local timezone to match Table display (which uses toLocaleDateString)
+      let formattedDob = '';
+      
+      if (s.dateOfBirth) {
+          const date = new Date(s.dateOfBirth);
+          if (!isNaN(date.getTime())) {
+              // Extract Local Time YYYY-MM-DD
+              // This aligns with how `new Date(string).toLocaleDateString()` works in the table
+              const yyyy = date.getFullYear();
+              const mm = String(date.getMonth() + 1).padStart(2, '0');
+              const dd = String(date.getDate()).padStart(2, '0');
+              formattedDob = `${yyyy}-${mm}-${dd}`;
+          } else {
+              // Fallback for legacy formats like DD/MM/YYYY
+              if (s.dateOfBirth.includes('/') && s.dateOfBirth.split('/').length === 3) {
+                  const parts = s.dateOfBirth.split('/');
+                  formattedDob = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              } else {
+                  formattedDob = s.dateOfBirth;
+              }
+          }
       }
 
       setFormData({
