@@ -319,7 +319,8 @@ const StudentList: React.FC = () => {
           motherYearOfBirth: s.motherYearOfBirth || '',
           guardianName: s.guardianName || '',
           guardianPhone: s.guardianPhone || '',
-          guardianJob: s.guardianJob || ''
+          guardianJob: s.guardianJob || '',
+          placeOfBirth: s.placeOfBirth || ''
       });
       setPreviewImage(s.avatar || null);
     } else {
@@ -649,10 +650,14 @@ const StudentList: React.FC = () => {
                              <input className="w-full p-2 border rounded" value={formData.firstName || ''} onChange={e => setFormData({...formData, firstName: e.target.value})} required />
                          </div>
                      </div>
-                     <div className="grid grid-cols-2 gap-4">
+                     <div className="grid grid-cols-3 gap-4">
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ngày sinh</label>
                              <input type="date" className="w-full p-2 border rounded" value={formData.dateOfBirth || ''} onChange={e => setFormData({...formData, dateOfBirth: e.target.value})} required />
+                         </div>
+                         <div>
+                             <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nơi sinh</label>
+                             <input className="w-full p-2 border rounded" value={formData.placeOfBirth || ''} onChange={e => setFormData({...formData, placeOfBirth: e.target.value})} placeholder="Tỉnh/TP" />
                          </div>
                          <div>
                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Giới tính</label>
