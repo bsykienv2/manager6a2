@@ -45,7 +45,9 @@ const StudentList: React.FC = () => {
   // Form State
   const [formData, setFormData] = useState<Partial<Student>>({
     firstName: '', lastName: '', fullName: '', gender: Gender.MALE, dateOfBirth: '', address: '',
-    status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: ''
+    status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: '',
+    fatherName: '', fatherPhone: '', fatherJob: '',
+    motherName: '', motherPhone: '', motherJob: '',
   });
 
   // --- IMAGE EDITOR STATES ---
@@ -60,25 +62,21 @@ const StudentList: React.FC = () => {
   const EDITOR_SIZE = 160; 
 
   const generateNewId = () => {
-      // Fallback ID generation if CCCD is missing
       return `HS${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 10000)}`;
   };
 
   const parseDate = (input: any): string => {
       if (!input) return '';
-      // If it's a number (Excel date)
       if (typeof input === 'number') {
            const date = new Date(Math.round((input - 25569) * 86400 * 1000));
            return date.toISOString().split('T')[0];
       }
-      // If string DD/MM/YYYY
       if (typeof input === 'string') {
           if (input.includes('/')) {
               const parts = input.split('/');
               if (parts.length === 3) return `${parts[2]}-${parts[1]}-${parts[0]}`;
           }
       }
-      // Attempt ISO
       try {
           return new Date(input).toISOString().split('T')[0];
       } catch {
@@ -107,14 +105,12 @@ const StudentList: React.FC = () => {
               data.forEach((row, index) => {
                   if (!row[1]) return; // Must have First Name
                   
-                  // FIX: Use CCCD as ID if available to ensure consistency
                   const cccd = row[7]?.toString().trim() || '';
                   let newId = '';
                   
                   if (cccd) {
                       newId = `HS${cccd}`;
                   } else {
-                      // Fallback if no CCCD
                       const timestamp = Date.now().toString().slice(-6);
                       const randomPart = Math.floor(Math.random() * 1000);
                       newId = `HS${timestamp}${index}${randomPart}`;
@@ -136,7 +132,6 @@ const StudentList: React.FC = () => {
                       status: 'studying',
                       cccd: cccd,
                       address: row[8]?.toString().trim() || '',
-                      // Parent Info
                       fatherName: row[9]?.toString().trim() || '',
                       fatherYearOfBirth: row[10]?.toString().trim() || '',
                       fatherPhone: row[11]?.toString().trim() || '',
@@ -154,7 +149,6 @@ const StudentList: React.FC = () => {
                       parentPhone: row[11]?.toString().trim() || row[15]?.toString().trim() || '',
                   };
                   
-                  // Deduplicate by ID (which is now HS + CCCD)
                   const isDuplicate = currentStudentsList.some(s => s.id === newStudent.id);
                   
                   if (isDuplicate) {
@@ -163,7 +157,6 @@ const StudentList: React.FC = () => {
                   }
                   
                   tempStudents.push(newStudent);
-                  // Add to local tracking list for next iterations in same loop
                   currentStudentsList.push(newStudent);
                   
                   stats.total++;
@@ -297,21 +290,15 @@ const StudentList: React.FC = () => {
     if (s) {
       setEditingStudent(s);
       
-      // FIX: Ensure dateOfBirth is in YYYY-MM-DD format for input type="date"
-      // AND respect local timezone to match Table display (which uses toLocaleDateString)
       let formattedDob = '';
-      
       if (s.dateOfBirth) {
           const date = new Date(s.dateOfBirth);
           if (!isNaN(date.getTime())) {
-              // Extract Local Time YYYY-MM-DD
-              // This aligns with how `new Date(string).toLocaleDateString()` works in the table
               const yyyy = date.getFullYear();
               const mm = String(date.getMonth() + 1).padStart(2, '0');
               const dd = String(date.getDate()).padStart(2, '0');
               formattedDob = `${yyyy}-${mm}-${dd}`;
           } else {
-              // Fallback for legacy formats like DD/MM/YYYY
               if (s.dateOfBirth.includes('/') && s.dateOfBirth.split('/').length === 3) {
                   const parts = s.dateOfBirth.split('/');
                   formattedDob = `${parts[2]}-${parts[1]}-${parts[0]}`;
@@ -324,18 +311,21 @@ const StudentList: React.FC = () => {
       setFormData({
           ...s,
           dateOfBirth: formattedDob,
-          status: s.status || 'studying'
+          status: s.status || 'studying',
+          fatherJob: s.fatherJob || '',
+          motherJob: s.motherJob || ''
       });
       setPreviewImage(s.avatar || null);
     } else {
       setEditingStudent(null);
       setFormData({
         firstName: '', lastName: '', fullName: '', gender: Gender.MALE, dateOfBirth: '', address: '',
-        status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: ''
+        status: 'studying', placeOfBirth: '', ethnicity: 'Kinh', cccd: '', avatar: '',
+        fatherName: '', fatherPhone: '', fatherJob: '',
+        motherName: '', motherPhone: '', motherJob: '',
       });
       setPreviewImage(null);
     }
-    // Reset Image Filters
     setImgScale(1);
     setImgBrightness(100);
     setImgBlur(0);
@@ -347,13 +337,10 @@ const StudentList: React.FC = () => {
     e.preventDefault();
     const fullName = `${formData.lastName || ''} ${formData.firstName || ''}`.trim();
     
-    // Process Avatar
     let finalAvatar = formData.avatar;
     if (previewImage) {
-        // If image changed or new
         finalAvatar = await processImage() || finalAvatar;
     } else if (!previewImage && editingStudent?.avatar) {
-        // If clear image
         finalAvatar = undefined;
     }
 
@@ -707,7 +694,7 @@ const StudentList: React.FC = () => {
                          </div>
                      </div>
                      
-                     {/* More fields as needed... Keeping it simple for reconstruction */}
+                     {/* CONTACT INFO WITH JOBS ADDED */}
                      <div className="border-t pt-4 mt-4">
                          <h4 className="font-bold text-gray-700 mb-2">Thông tin liên hệ</h4>
                          <div className="grid grid-cols-1 gap-4">
@@ -715,7 +702,9 @@ const StudentList: React.FC = () => {
                                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Địa chỉ</label>
                                  <input className="w-full p-2 border rounded" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
                              </div>
-                             <div className="grid grid-cols-2 gap-4">
+                             
+                             {/* Father Info */}
+                             <div className="grid grid-cols-3 gap-4">
                                  <div>
                                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ tên Cha</label>
                                      <input className="w-full p-2 border rounded" value={formData.fatherName} onChange={e => setFormData({...formData, fatherName: e.target.value})} />
@@ -724,8 +713,14 @@ const StudentList: React.FC = () => {
                                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">SĐT Cha</label>
                                      <input className="w-full p-2 border rounded" value={formData.fatherPhone} onChange={e => setFormData({...formData, fatherPhone: e.target.value})} />
                                  </div>
+                                 <div>
+                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nghề nghiệp</label>
+                                     <input className="w-full p-2 border rounded" value={formData.fatherJob} onChange={e => setFormData({...formData, fatherJob: e.target.value})} />
+                                 </div>
                              </div>
-                             <div className="grid grid-cols-2 gap-4">
+
+                             {/* Mother Info */}
+                             <div className="grid grid-cols-3 gap-4">
                                  <div>
                                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Họ tên Mẹ</label>
                                      <input className="w-full p-2 border rounded" value={formData.motherName} onChange={e => setFormData({...formData, motherName: e.target.value})} />
@@ -733,6 +728,10 @@ const StudentList: React.FC = () => {
                                  <div>
                                      <label className="block text-xs font-bold text-gray-500 uppercase mb-1">SĐT Mẹ</label>
                                      <input className="w-full p-2 border rounded" value={formData.motherPhone} onChange={e => setFormData({...formData, motherPhone: e.target.value})} />
+                                 </div>
+                                 <div>
+                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Nghề nghiệp</label>
+                                     <input className="w-full p-2 border rounded" value={formData.motherJob} onChange={e => setFormData({...formData, motherJob: e.target.value})} />
                                  </div>
                              </div>
                          </div>
