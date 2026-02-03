@@ -95,28 +95,33 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Helper: Đảm bảo người dùng quản trị luôn tồn tại và KHÔNG TRÙNG LẶP
+  // Updated with Trim and stricter normalization
   const ensurePrivilegedUsers = (users: UserAccount[]): UserAccount[] => {
-      // 1. Merge danh sách hiện tại với danh sách mặc định (nếu thiếu)
-      let merged = [...users];
+      // 1. Clean existing users: Trim usernames
+      const cleanedUsers = users.map(u => ({
+          ...u,
+          username: (u.username || '').trim()
+      }));
+
+      // 2. Merge with defaults (checks against cleaned list)
       const defaults = Storage.INITIAL_USERS;
-      
       defaults.forEach(defUser => {
-          const exists = merged.some(u => u.username === defUser.username);
+          const defUsername = defUser.username.trim().toLowerCase();
+          // Check if default user exists in cleaned list (case-insensitive)
+          const exists = cleanedUsers.some(u => u.username.toLowerCase() === defUsername);
           if (!exists) {
-              merged.push(defUser);
+              cleanedUsers.push(defUser);
           }
       });
 
-      // 2. Deduplicate: Loại bỏ trùng lặp dựa trên Username
-      // Sử dụng Set để theo dõi username đã xuất hiện
+      // 3. Deduplicate (Keep first occurrence based on lowercase username)
       const uniqueUsers: UserAccount[] = [];
       const seenUsernames = new Set<string>();
 
-      merged.forEach(u => {
-          // Chuẩn hóa username về chữ thường để so sánh chính xác
-          const normalizedUsername = (u.username || '').toLowerCase();
-          if (!seenUsernames.has(normalizedUsername)) {
-              seenUsernames.add(normalizedUsername);
+      cleanedUsers.forEach(u => {
+          const normalizedKey = u.username.toLowerCase();
+          if (!seenUsernames.has(normalizedKey)) {
+              seenUsernames.add(normalizedKey);
               uniqueUsers.push(u);
           }
       });
@@ -275,7 +280,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const registerUser = (user: UserAccount) => {
       const newUser = { ...user, status: 'pending' as const };
       // Check duplicate before add
-      const exists = userAccounts.some(u => u.username === newUser.username);
+      const exists = userAccounts.some(u => u.username.trim().toLowerCase() === newUser.username.trim().toLowerCase());
       if (!exists) {
           const newAccounts = [...userAccounts, newUser];
           setUserAccounts(newAccounts);
@@ -286,8 +291,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addUserAccount = (user: UserAccount) => {
       const newUser = { ...user, status: user.status || 'active' };
-      // Check duplicate before add
-      const exists = userAccounts.some(u => u.username === newUser.username);
+      // Check duplicate before add (strict case insensitive)
+      const exists = userAccounts.some(u => u.username.trim().toLowerCase() === newUser.username.trim().toLowerCase());
       if (!exists) {
           const newAccounts = [...userAccounts, newUser];
           setUserAccounts(newAccounts);
@@ -462,27 +467,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       Storage.saveMessages(newMessages);
 
       // 2. Create Notification for the Receiver
-      // Determine the category name/sender name
       const senderName = currentUser?.fullName || 'Người gửi';
       const notification: NotificationItem = {
           id: `notif_${msg.id}`,
           title: `Tin nhắn mới từ ${senderName}`,
-          content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''), // Preview content
+          content: msg.content.substring(0, 100) + (msg.content.length > 100 ? '...' : ''), 
           date: new Date().toISOString(),
           type: 'info',
-          category: 'message', // Special category to distinguish
+          category: 'message', 
           senderName: senderName
       };
       
-      // NOTE: We're adding to the global notification list here. 
-      // In a real backend, we'd target the specific user. 
-      // Here, filtering happens in UI based on roles/context if needed, 
-      // or we accept that "Class Notifications" are broadcast.
-      // To simulate private notification, we'll rely on the receiver checking their Messages tab, 
-      // OR we add this notification globally but UI filters it. 
-      // Since `notifications` are currently global/class-wide in this simple app architecture,
-      // we'll add it, but strictly speaking, it should only be visible to the receiver.
-      // For now, let's add it to the notification list so it shows up in the "Notifications" page as requested.
       addNotification(notification);
   };
 
