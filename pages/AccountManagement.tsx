@@ -227,8 +227,8 @@ const AccountManagement: React.FC = () => {
   };
 
   const validateForm = () => {
-      if (!formData.username || String(formData.username).length < 3) {
-          showToast('error', 'Tên đăng nhập phải có ít nhất 3 ký tự');
+      if (!formData.username || String(formData.username).trim().length < 3) {
+          showToast('error', 'Tên đăng nhập phải có ít nhất 3 ký tự (không tính khoảng trắng)');
           return false;
       }
       if (!formData.fullName) {
@@ -240,8 +240,8 @@ const AccountManagement: React.FC = () => {
           return false;
       }
       if (!editingUser) {
-          // Ensure comparison matches types
-          const exists = userAccounts.some(u => String(u.username) === String(formData.username));
+          // Validate with TRIM
+          const exists = userAccounts.some(u => String(u.username).trim().toLowerCase() === String(formData.username).trim().toLowerCase());
           if (exists) {
               showToast('error', 'Tên đăng nhập đã tồn tại');
               return false;
@@ -260,14 +260,19 @@ const AccountManagement: React.FC = () => {
           finalAvatar = await processImage() || finalAvatar;
       }
 
-      const updatedData = { ...formData, avatar: finalAvatar };
+      // Trim username on save
+      const cleanData = {
+          ...formData,
+          username: String(formData.username).trim(),
+          avatar: finalAvatar
+      };
 
       if (editingUser) {
-          updateUserAccount(updatedData as UserAccount);
+          updateUserAccount(cleanData as UserAccount);
           showToast('success', 'Cập nhật tài khoản thành công');
       } else {
           const newUser: UserAccount = {
-              ...updatedData as UserAccount,
+              ...cleanData as UserAccount,
               id: Date.now().toString(),
               status: 'active'
           };
@@ -321,7 +326,7 @@ const AccountManagement: React.FC = () => {
 
       const newAccount: UserAccount = {
           id: `ph_${parentToGrant.student.id}_${Date.now()}`,
-          username: grantFormData.username,
+          username: grantFormData.username.trim(), // Trim here
           password: grantFormData.password, 
           fullName: grantFormData.fullName,
           role: Role.PARENT,
