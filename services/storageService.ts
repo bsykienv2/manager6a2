@@ -15,7 +15,7 @@ const STORAGE_KEYS = {
 };
 
 // Đặt rỗng để buộc người dùng nhập URL mới
-const DEFAULT_API_URL = ''; 
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbyYlYm0BxW5V05b8tCcdoU9ms-oUKJ2MyV4zZ5bff85jcovuOC3AxtHvazwRrnNhg71NA/exec'; 
 
 const safeParse = <T>(key: string, defaultValue: T): T => {
   try {
